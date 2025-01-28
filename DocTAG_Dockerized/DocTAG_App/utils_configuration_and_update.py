@@ -881,6 +881,8 @@ from datetime import date
 def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jsonall, username, password, topics,runs,tfidf):
 
     """This method is run after having checked the files inserted by the user"""
+    import logging
+    from tqdm import tqdm
 
     filename = ''
     language = 'english'
@@ -888,6 +890,10 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
     report_usecases = []
     created_file = False
     today = str(date.today())
+
+    # initialize logger
+    logger = logging.getLogger(__name__)
+    logger.info("Starting configuration of the database")
 
     try:
         with transaction.atomic():
@@ -942,6 +948,8 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
                         all_fields.append(el)
             language = 'english'
 
+            logger.debug("Starting with error location topic")
+
             arr_to_ret = elaborate_runs(runs)
             error_location = 'Topic'
             for topic in topics:
@@ -951,6 +959,8 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
                     process_topic_json_file(arr_to_ret,topic)
                 elif topic.name.endswith('csv'):
                     process_topic_csv_file(arr_to_ret,topic)
+                
+            logger.debug("Starting with error location collection")
 
             error_location = 'Collection'
 
@@ -973,6 +983,7 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
                 # if file.name.endswith('json'):
                 find_docs_in_json_pubmed_collection(arr_to_ret,file)
 
+            logger.debug("Starting with error location runs")
 
             error_location = 'Runs'
             for el in arr_to_ret:
@@ -983,6 +994,7 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
 
                 TopicHasDocument.objects.get_or_create(name = topic,language = doc.language,id_report =doc)
 
+            logger.debug("Starting with error location labels")
 
             if len(labels) > 0:
                 labs = []
@@ -1026,6 +1038,7 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
                         cursor.execute("INSERT INTO annotation_label (label,seq_number) VALUES (%s,%s);",
                                        (str(label), int(seq_number)))
 
+            logger.debug("Starting with error location concepts")
             # Popolate the concepts table
             error_location = 'Concepts'
             # if load_concepts is not None and load_concepts != '' and load_concepts !=[] and len(concepts) == 0:
@@ -1143,7 +1156,7 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
                 cursor = connection.cursor()
 
                 json_to_write = {}
-                for top in t:
+                for top in tqdm(t, desc='Topics'):
                     json_to_write[top.name] = {}
                     topic = {}
                     corpus = []
@@ -1206,6 +1219,9 @@ def configure_data(pubmedfiles,reports, labels, concepts, jsondisp, jsonann, jso
                 json.dump(json_to_write, f)
 
         json_resp = {'message': 'Ok'}
+        print("\n------------------------")
+        print("Configuration completed")
+        print("------------------------\n")
         return json_resp
 
 #-------------------UPDATE----------------------------
